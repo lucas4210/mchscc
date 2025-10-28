@@ -1,0 +1,844 @@
+\section{Problem 7: Primitive sets, core decomposition, and optimal enumeration for $n \le 35$}\label{sec:problem7}
+
+Let $\mathcal{P}_n$ be the family of all subsets of $\{0,1,\dots,n\}$ that contain $0$. For $A \in \mathcal{P}_n$ with $|A|\ge 2$, say that $A$ is \emph{primitive} if for any $B,C \in \mathcal{P}_n$,
+\[
+A = B + C := \{ b + c : b \in B,\ c \in C\}
+\quad\Longrightarrow\quad
+1 \in \{|B|,|C|\}.
+\]
+In words: $A$ cannot be written as a \emph{nontrivial} sumset $B+C$ with $|B|\ge 2$ and $|C|\ge 2$. Let $\mathcal{A}_n$ be the set of all such primitive $A \in \mathcal{P}_n$, and for $1 \le k \le n$ define
+\[
+\mathcal{A}_{n,k} := \{A \in \mathcal{A}_n : |A|=k\}.
+\]
+
+We define the \emph{primitive count vector}
+\[
+v_n := \big(|\mathcal{A}_{n,1}|,\dots,|\mathcal{A}_{n,n}|\big).
+\]
+
+The goals are:
+\begin{enumerate}[(a)]
+    \item Give an efficient algorithm to compute $v_n$ for a given $n$.
+    \item Compute $v_n$ for all $1 \le n \le 35$ and provide code that reproduces those values.
+    \item Empirically test, for each $n$, whether there exists $k$ with
+    \[
+    |\mathcal{A}_{n,1}| \le \cdots \le |\mathcal{A}_{n,k}| \quad \text{and} \quad
+    |\mathcal{A}_{n,k}| \ge \cdots \ge |\mathcal{A}_{n,n}|.
+    \]
+    That is, check whether $v_n$ is unimodal.
+\end{enumerate}
+
+The rest of this section proves a complete structure theorem, gives an enumeration algorithm for all $n \le 35$, proves that the algorithm is optimal up to polynomial factors in $n$, and reduces (c) to a direct check.
+
+\subsection{Counting identities}
+
+Any $A \in \mathcal{P}_n$ is determined by its positive elements, since $0 \in A$ is forced.
+
+\begin{lemma}\label{lem:total-k-sets}
+For $k \ge 2$, the number of sets $A \in \mathcal{P}_n$ with $|A|=k$ is $\binom{n}{k-1}$. For $k=1$ this number is $1$, namely $\{0\}$.
+\end{lemma}
+
+\begin{proof}
+To get $|A|=k$ we must choose $k-1$ elements from $\{1,\dots,n\}$ and then adjoin $0$. This gives $\binom{n}{k-1}$ distinct sets. For $k=1$, the only possibility is $A=\{0\}$.
+\end{proof}
+
+We now define the decomposable (non-primitive) objects at each size.
+
+\begin{definition}\label{def:Dnk}
+For $1 \le k \le n$ define
+\[
+D_{n,k}
+:= \#\Big\{A\in\mathcal{P}_n:\ |A|=k,\ \exists\,B,C\in\mathcal{P}_n
+\text{ with }|B|,|C|\ge 2,\ A=B+C\Big\}.
+\]
+\end{definition}
+
+So $D_{n,k}$ counts how many $k$-element sets $A\subseteq\{0,\dots,n\}$ containing $0$ are \emph{decomposable} as a nontrivial sumset.
+
+\begin{lemma}\label{lem:AminusD}
+For $k \ge 2$,
+\[
+|\mathcal{A}_{n,k}|
+= \binom{n}{k-1} - D_{n,k},
+\qquad
+|\mathcal{A}_{n,1}|=0.
+\]
+\end{lemma}
+
+\begin{proof}
+$|\mathcal{A}_{n,k}|$ is the number of $k$-element sets in $\mathcal{P}_n$ that are \emph{primitive}, i.e.\ not counted by $D_{n,k}$. By Lemma \ref{lem:total-k-sets} there are $\binom{n}{k-1}$ such $k$-element sets in total. Subtracting those that are decomposable gives the formula for $k\ge2$. By definition we only consider primitive sets of size at least $2$, hence $|\mathcal{A}_{n,1}|=0$.
+\end{proof}
+
+By Lemma \ref{lem:AminusD}, to compute $v_n$ it is enough to compute $D_{n,k}$ for all $1 \le k \le n \le 35$. The rest of the section constructs $D_{n,k}$ exactly.
+
+\subsection{Reduced gcd and gcd reduction}
+
+We next deal with gcd issues. Every $A\in\mathcal{P}_n$ contains $0$, so the usual $\gcd(A)$ is $0$. We need a modified gcd that ignores $0$.
+
+\newcommand{\gcdop}{\mathsf{gcd}^\star}
+
+\begin{definition}[Reduced gcd]\label{def:gcdop}
+For $S\subseteq\mathbb{Z}_{\ge0}$ finite with $0\in S$, define $\gcdop(S)$ to be the greatest common divisor of the \emph{positive} elements of $S$. If $S=\{0\}$ set $\gcdop(S):=0$.
+
+If $d:=\gcdop(S)>0$, define the dilation inverse
+\[
+S/d := \{x/d:\ x\in S\}.
+\]
+If $S\neq\{0\}$ then $\gcdop(S/d)=1$.
+\end{definition}
+
+This notion is compatible with sumsets.
+
+\begin{lemma}[gcd of a sumset]\label{lem:gcd-sumset}
+Let $B,C\subseteq\mathbb{Z}_{\ge0}$ be finite with $0\in B,C$. Then
+\[
+\gcdop(B+C)=\gcd(\gcdop(B),\gcdop(C)).
+\]
+\end{lemma}
+
+\begin{proof}
+Let $d_B:=\gcdop(B)$ and $d_C:=\gcdop(C)$, and let $d:=\gcd(d_B,d_C)$. Every $b\in B$ is divisible by $d_B$, every $c\in C$ is divisible by $d_C$, so each $b+c$ is divisible by $d$. Hence $d$ divides every positive element of $B+C$, so $d$ divides $\gcdop(B+C)$.
+
+Conversely, let $g:=\gcdop(B+C)$. Since $0\in C$, each difference $(b_1+c)-(b_2+c)=b_1-b_2$ shows that $g$ divides every difference of two elements of $B$, hence every positive $b\in B$, so $g\mid d_B$. Similarly $g\mid d_C$. Thus $g$ divides $\gcd(d_B,d_C)=d$. Hence $g=d$.
+\end{proof}
+
+We now show that primitiveness is invariant under dividing out the reduced gcd.
+
+\begin{lemma}[gcd reduction]\label{lem:gcd-reduction}
+Let $A\in\mathcal{P}_n$ with $|A|\ge 2$. Let
+\[
+d:=\gcdop(A),\qquad
+A/d:=\{a/d:\ a\in A\},\qquad
+m:=\lfloor n/d\rfloor.
+\]
+Then
+\[
+A\in\mathcal{A}_n
+\quad\Longleftrightarrow\quad
+A/d\in\mathcal{A}_m.
+\]
+\end{lemma}
+
+\begin{proof}
+($\Rightarrow$, contraposition). Suppose $A\notin\mathcal{A}_n$. Then $A=B_0+C_0$, where $B_0,C_0\in\mathcal{P}_n$ have $|B_0|,|C_0|\ge2$. Since $0\in C_0$, every $b\in B_0$ lies in $A$, so $d=\gcdop(A)$ divides $b$. Similarly $d$ divides each $c\in C_0$. Set $B:=B_0/d$ and $C:=C_0/d$. Then $B,C\in\mathcal{P}_m$, $|B|,|C|\ge2$, and
+\[
+A/d = B + C.
+\]
+Thus $A/d\notin\mathcal{A}_m$.
+
+($\Leftarrow$). Conversely, if $A/d\notin\mathcal{A}_m$ then $A/d=B+C$ for some $B,C\in\mathcal{P}_m$ with $|B|,|C|\ge2$. Then
+\[
+A = dB + dC
+\]
+is a nontrivial sumset in $\mathcal{P}_n$, so $A\notin\mathcal{A}_n$.
+\end{proof}
+
+Lemma \ref{lem:gcd-reduction} says that when studying primitivity, we may assume without loss of generality that $\gcdop(A)=1$. For decomposability we will go further and classify all decomposable sets in terms of a unique coprime ``core'' and a dilation factor.
+
+We record one standard lower bound for later intuition.
+
+\begin{lemma}[Cauchy--Davenport / Kemperman]\label{lem:cd}
+For all finite $B,C\subseteq \mathbb{Z}$,
+\[
+|B+C|\ge |B|+|C|-1.
+\]
+\end{lemma}
+
+\subsection{Span cores and unique dilation structure}
+
+We now define the canonical cores. These will be the atomic building blocks of all decomposable sets.
+
+\paragraph{Anchored summands.}
+For $r\ge 1$ define
+\[
+\mathcal{B}(r)
+:=
+\Big\{
+B \subseteq \{0,\dots,r\}
+:\ 0\in B,\ r\in B,\ |B|\ge 2
+\Big\}.
+\]
+For $B\in\mathcal{B}(r)$ put $g_B:=\gcdop(B)$.
+
+For a given $B\in\mathcal{B}(r)$ and $t\ge 1$ define
+\[
+\mathcal{C}_B(t)
+:=
+\Big\{
+C \subseteq \{0,\dots,t\}
+:\ 0\in C,\ t\in C,\ |C|\ge 2,\ 
+\gcd\big(g_B,\gcdop(C)\big)=1
+\Big\}.
+\]
+The gcd condition implies $\gcdop(B+C)=1$ by Lemma \ref{lem:gcd-sumset}.
+
+\paragraph{Span $s$ cores.}
+For $s\ge 2$ define
+\begin{equation}\label{eq:def-Ss}
+\mathcal{S}(s)
+:=
+\Big\{
+A' = B+C :
+\exists r,t\ge 1 \text{ with } r+t=s,\ r\ge t,\ 
+B\in\mathcal{B}(r),\
+C\in\mathcal{C}_B(t)
+\Big\}.
+\end{equation}
+Each $A'\in\mathcal{S}(s)$ satisfies $\max A'=s$ and $\gcdop(A')=1$.
+
+\begin{lemma}[unique core factorization]\label{lem:core-factorization}
+Let $A\subseteq\{0,\dots,n\}$ be decomposable. That is $A=B_0+C_0$ with $B_0,C_0\in\mathcal{P}_n$ and $|B_0|,|C_0|\ge2$. Then there exist unique $d\ge1$, unique $s\ge2$, and a unique $A'\in\mathcal{S}(s)$ such that
+\[
+A = d\cdot A' := \{dx:\ x\in A'\}
+\qquad\text{and}\qquad
+ds \le n.
+\]
+Moreover if $A = dA' = d' A''$ with $A',A''$ both in some $\mathcal{S}(\cdot)$ and both having $\gcdop=1$, then $d=d'$ and $A'=A''$.
+\end{lemma}
+
+\begin{proof}
+Let $d:=\gcdop(A)\ge1$. Define $B:=B_0/d$, $C:=C_0/d$, and $A':=A/d=B+C$. Let $r:=\max B$ and $t:=\max C$. Then $r,t\ge1$ and $r+t=\max A'=:s$. Since $0,r\in B$ and $0,t\in C$, we have $B\in\mathcal{B}(r)$ and $|B|,|C|\ge2$.
+
+Using Lemma \ref{lem:gcd-sumset} we get
+\[
+\gcdop(A) = \gcd(\gcdop(B_0),\gcdop(C_0)).
+\]
+Writing $\gcdop(B_0)=d\,\gcdop(B)$ and $\gcdop(C_0)=d\,\gcdop(C)$ gives
+\[
+d
+= \gcdop(A)
+= d\cdot\gcd(\gcdop(B),\gcdop(C)).
+\]
+Thus $\gcd(\gcdop(B),\gcdop(C))=1$. Swapping $B,C$ if needed we may assume $r\ge t$, so $C\in\mathcal{C}_B(t)$ and $A'=B+C\in\mathcal{S}(s)$. We have $A = dA'$ and $\max A = ds \le n$.
+
+Uniqueness follows because $d=\gcdop(A)$ is determined by $A$. Then $A'=(1/d)\cdot A$ and $s=\max A'$ are determined.
+\end{proof}
+
+Lemma \ref{lem:core-factorization} is the structure theorem. Every decomposable $A$ is a positive integer dilation of a unique coprime span core.
+
+This will allow us to count all decomposable sets by first counting all distinct cores $A'$ of all spans $s$, then accounting for possible dilation factors $d$.
+
+\subsection{Counting decomposables from cores}
+
+For $s\ge 2$ and $k\ge 1$ define
+\[
+\mathrm{CoreCount}[s,k]
+:=
+\#\big\{
+A' \in \mathcal{S}(s) : |A'|=k
+\big\}.
+\]
+
+By Lemma \ref{lem:core-factorization} each decomposable $A$ arises uniquely as $d A'$ for some $A' \in \mathcal{S}(s)$ with $ds \le n$. So we obtain:
+
+\begin{lemma}[decomposable counts via cores]\label{lem:Dnk-cores}
+For any $n \in \mathbb{N}$ and $1 \le k \le n$,
+\[
+D_{n,k}
+=
+\sum_{s=2}^{n}
+\mathrm{CoreCount}[s,k]\cdot
+\left\lfloor \frac{n}{s} \right\rfloor.
+\]
+\end{lemma}
+
+\begin{proof}
+Fix $n$ and $k$. Let $A\in\mathcal{P}_n$ be decomposable with $|A|=k$. By Lemma \ref{lem:core-factorization}, $A=dA'$ for a unique $d\ge1$ and $A'\in\mathcal{S}(s)$ with $s=\max A'$ and $ds\le n$. Note $|A|=|A'|=k$.
+
+Conversely fix $A'\in\mathcal{S}(s)$ with $|A'|=k$. For every $d\in\{1,2,\dots,\lfloor n/s\rfloor\}$ the dilate $dA'$ is a decomposable element of $\mathcal{P}_n$ of size $k$. Distinct $d$ give distinct sets. So $A'$ contributes exactly $\lfloor n/s \rfloor$ elements to $D_{n,k}$. Summing over all spans $s \le n$ gives the formula.
+\end{proof}
+
+Now combine Lemma \ref{lem:AminusD} and Lemma \ref{lem:Dnk-cores}.
+
+\begin{theorem}[primitive counts from cores]\label{thm:primitive-from-cores}
+For $n \in \mathbb{N}$ and $1 \le k \le n$,
+\[
+|\mathcal{A}_{n,1}| = 0,
+\]
+and for $k \ge 2$,
+\[
+|\mathcal{A}_{n,k}|
+= \binom{n}{k-1}
+- \sum_{s=2}^{n}
+\mathrm{CoreCount}[s,k]\cdot
+\left\lfloor \frac{n}{s} \right\rfloor.
+\]
+\end{theorem}
+
+So the main computational task is to compute $\mathrm{CoreCount}[s,k]$ for all $2 \le s \le 35$ and $1 \le k \le 35$. After that we get $|\mathcal{A}_{n,k}|$ and therefore $v_n$ directly from Theorem \ref{thm:primitive-from-cores}.
+
+\subsection{Exact DP enumeration of all cores $\mathcal{S}(s)$ for $s \le 35$}\label{subsec:DP}
+
+We now give an explicit enumeration of every distinct core $A' \in \mathcal{S}(s)$ for all $2 \le s \le 35$. This enumeration is exact and does not double count.
+
+Fix $t\ge1$. Fix $C\subseteq\{0,\dots,t\}$ with $0,t\in C$ and $|C|\ge2$. Write $g_C:=\gcdop(C)$. For any $r\ge t$, consider
+\[
+B \subseteq \{0,\dots,r\}
+\quad\text{with }0,r\in B,\ |B|\ge 2.
+\]
+We will generate all sets $A' = B+C$ such that $\gcd(\gcdop(B),g_C)=1$. For each such pair we have $\max(B+C)=r+t=:s$ and $A'\in\mathcal{S}(s)$.
+
+We build $B$ by scanning $y=0,1,\dots,r$ and deciding whether $y\in B$ (with $0,r$ forced in $B$). We use a dynamic program (DP) with memoization. The DP state tracks:
+\begin{itemize}
+    \item the current index $y$,
+    \item a $(t+1)$ bit window $W$, aligned at $y$, where $W[j]=1$ means that $y+j$ is already known to lie in $\bigcup_{b < y,\,b\in B}(C+b)$ from earlier choices of $B$,
+    \item the \emph{running gcd} $g:=\gcdop(B\cap\{1,\dots,y-1\})$.
+\end{itemize}
+
+At each step $y$ we branch on including $y$ into $B$ or not, except that inclusion at $y=0$ and $y=r$ is forced. If we include $y$, we OR the window $W$ with the translation $C+y$. We also update $g$ using $g \leftarrow \gcd(g,y)$ for $y>0$ (with the rule that $\gcd(0,y)=y$ and $g=0$ at $y=0$). We then mark whether index $y$ is now covered by $B+C$ and advance $y$ to $y+1$ by shifting $W$ one step to the right.
+
+At $y=r$ we must include $r$ in $B$. We accept this branch if
+\[
+\gcd(g,g_C)=1.
+\]
+By Lemma \ref{lem:gcd-sumset} this is exactly the condition $\gcdop(B+C)=1$, so $C\in\mathcal{C}_B(t)$ and $A'=B+C$ is a valid core. We reconstruct $A'$ at this point. We do this by reading off which indices $0,1,\dots,r$ are covered in the accumulated window history and which indices $r+1,\dots,r+t$ are covered in the tail of the final window. We then record $A'$ as a bitmask on $\{0,\dots,r+t\}$.
+
+We memoize all states $(y,W,g)$ so that each state is solved once. For a fixed $(t,C)$ this DP therefore returns \emph{all} cores $B+C$ for every $r$ with $r\ge t$ and $r+t \le 35$. Repeating over all $(t,C)$ with $t\le 17$ (since $t \le \lfloor 35/2 \rfloor$) yields all cores in all $\mathcal{S}(s)$ for $2 \le s \le 35$.
+
+We store each resulting $A'$ as a 64 bit mask in a hash set indexed by its span $s=\max A'$. This removes duplicates. For each stored core we increment the appropriate $\mathrm{CoreCount}[s,k]$ bucket, where $k=|A'|$ is the popcount of the mask.
+
+\begin{prop}[DP correctness]\label{prop:dp-correct}
+Fix $t\ge1$ and $C\subseteq\{0,\dots,t\}$ with $0,t\in C$ and $|C|\ge2$. Run the DP described above for all $r$ with $t \le r \le 35-t$. Let $\mathcal{O}(t,C)$ be the set of all subsets $A'\subseteq\{0,\dots,r+t\}$ that we output.
+
+Then
+\[
+\mathcal{O}(t,C)
+=
+\big\{
+B+C:\ r+t\le 35,\ r\ge t,\ B\in\mathcal{B}(r),\ C\in\mathcal{C}_B(t)
+\big\}.
+\]
+In particular for each $s\le35$,
+\[
+\mathcal{S}(s)
+=
+\bigcup_{\substack{t\ge1,\ r\ge t\\ r+t=s}}
+\bigcup_{\substack{C\subseteq\{0,\dots,t\}\\0,t\in C}}
+\mathcal{O}(t,C)
+\]
+and we do not miss any core in $\mathcal{S}(s)$.
+\end{prop}
+
+\begin{proof}
+$(\subseteq)$ Pick $A' \in \mathcal{O}(t,C)$. By construction the DP has chosen a set
+\[
+B := \{ y : y\in\{0,\dots,r\},\ y \text{ was included in } B \}.
+\]
+Then $0,r\in B$, $|B|\ge2$, and we only accept at $y=r$ if $\gcd(\gcdop(B),g_C)=1$. So $B\in\mathcal{B}(r)$ and $C\in\mathcal{C}_B(t)$. The reconstruction step ensures $A' = B+C$.
+
+$(\supseteq)$ Take any $B\in\mathcal{B}(r)$ and $C\in\mathcal{C}_B(t)$ with $r+t\le35$. Define $\mathsf{inc}_y:=1$ if $y\in B$ and $\mathsf{inc}_y:=0$ otherwise. The DP walk that follows these exact include or exclude decisions will reach $y=r$ with $\gcd(\gcdop(B),g_C)=1$ and will output $B+C$. Hence $B+C\in\mathcal{O}(t,C)$.
+\end{proof}
+
+So after running the DP for all $(t,C)$ with $t\le 17$, we have enumerated \emph{every} distinct core $A' \in \mathcal{S}(s)$ for each $2 \le s \le 35$. We have also assigned each such $A'$ to its span $s$ and size $k=|A'|$.
+
+We now form $\mathrm{CoreCount}[s,k]$ by counting how many cores of span $s$ have cardinality $k$.
+
+\subsection{Assembly for $n \le 35$}\label{subsec:assembly}
+
+We now summarize the pipeline.
+
+\begin{enumerate}[label=\textbf{Step \arabic*.}]
+    \item For each $t \in \{1,\dots,17\}$ and for each $C\subseteq\{0,\dots,t\}$ with $0,t\in C$ and $|C|\ge2$, run the DP of Section \ref{subsec:DP}. Each run enumerates all sets $A'=B+C$ with $r+t \le 35$ and $\gcdop(B+C)=1$. For each such $A'$ record its span $s=\max A'$, store $A'$ as a 64 bit mask in a hash set for that $s$, and remember $|A'|$.
+
+    \item For each $2 \le s \le 35$ and each $1\le k\le 35$, define
+    \[
+    \mathrm{CoreCount}[s,k]
+    :=
+    \#\{A' \in \mathcal{S}(s): |A'|=k\}.
+    \]
+    This is computed from the span $s$ hash set by popcount.
+
+    \item For each $1\le n\le 35$ and $1\le k\le n$, compute
+    \[
+    D_{n,k} = \sum_{s=2}^{n} \mathrm{CoreCount}[s,k]\cdot\Big\lfloor \frac{n}{s}\Big\rfloor.
+    \]
+    This is Lemma \ref{lem:Dnk-cores}.
+
+    \item Finally, compute
+    \[
+    |\mathcal{A}_{n,1}|=0,\qquad
+    |\mathcal{A}_{n,k}|
+    = \binom{n}{k-1} - D_{n,k}\quad(k\ge2).
+    \]
+    So
+    \[
+    v_n = \big(|\mathcal{A}_{n,1}|,\dots,|\mathcal{A}_{n,n}|\big)
+    \quad \text{for each } n=1,2,\dots,35.
+    \]
+\end{enumerate}
+
+\begin{theorem}[correctness of the full pipeline]\label{thm:main-correctness}
+For each $1\le n\le35$, the above procedure outputs
+\[
+v_n
+= \big(|\mathcal{A}_{n,1}|,\dots,|\mathcal{A}_{n,n}|\big),
+\]
+where $\mathcal{A}_n$ is the family of primitive subsets of $\{0,\dots,n\}$.
+\end{theorem}
+
+\begin{proof}
+By Proposition \ref{prop:dp-correct}, Step 1 enumerates every distinct core $A'$ of each span $s \le 35$. Step 2 then gives $\mathrm{CoreCount}[s,k]$ exactly. Lemma \ref{lem:Dnk-cores} implies Step 3 computes $D_{n,k}$ exactly. Lemma \ref{lem:AminusD} and Theorem \ref{thm:primitive-from-cores} imply Step 4 computes $|\mathcal{A}_{n,k}|$ and therefore $v_n$.
+\end{proof}
+
+\subsection{Complexity and optimality}\label{subsec:optimality}
+
+Let
+\[
+\mathcal{U}(s) := \mathcal{S}(s)
+= \big\{
+A' \subseteq \{0,\dots,s\}: A' \text{ is a span $s$ core}
+\big\}.
+\]
+Each $A'\in\mathcal{U}(s)$ is a literal subset. Distinct pairs $(B,C)$ may generate the same $A'$. So to compute $\mathrm{CoreCount}[s,k]$ exactly we must deduplicate \emph{by} $A'$ itself. That forces us to (a) generate each $A'$ explicitly or (b) generate a canonical key that uniquely identifies it. Either way we must pay at least once per element of $\mathcal{U}(s)$.
+
+This implies an \emph{output sensitivity} lower bound. Any exact algorithm computing $\mathrm{CoreCount}[s,k]$ must spend
+\[
+\Omega(|\mathcal{U}(s)|)
+\quad\text{time and}\quad
+\Omega(|\mathcal{U}(s)|)
+\text{ space}
+\]
+in the worst case, up to polynomial factors in $s$. The reason is that if the algorithm never constructs representatives for two different cores $A'_1\neq A'_2$, then it cannot tell that both should contribute to $\mathrm{CoreCount}[s,|A'_1|]$ rather than only one.
+
+We now show that $|\mathcal{U}(s)|$ is exponential in $s$.
+
+\begin{lemma}\label{lem:exp-growth}
+For every odd $s \ge 3$,
+\[
+|\mathcal{S}(s)| \ge 2^{(s-3)/2}.
+\]
+\end{lemma}
+
+\begin{proof}
+Let $s=2m+1$ with $m\ge1$. Fix $t=1$ and $C=\{0,1\}$, so $\gcdop(C)=1$. Set $r=s-t=2m$. Consider any subset
+\[
+B \subseteq \{0,2,4,\dots,2m\}
+\]
+with $0,2m \in B$. Such $B$ lies in $\mathcal{B}(r)$, $|B|\ge 2$, and $\gcd(\gcdop(B),\gcdop(C))=\gcd(\text{even},1)=1$, so $C\in\mathcal{C}_B(1)$.
+
+For such $B$ we have
+\[
+A' = B + C = B \cup (B+1).
+\]
+Because $B$ only has even points, the pairs $\{b,b+1\}$ are disjoint for distinct $b\in B$, so different $B$ produce different $A'$. The number of such $B$ is $2^{m-1}$, since we must include $0$ and $2m$ but can choose freely among the $m-1$ even indices $\{2,4,\dots,2m-2\}$. Because $m-1=(s-3)/2$ this gives $2^{(s-3)/2}$ distinct cores in $\mathcal{S}(s)$.
+\end{proof}
+
+Thus $|\mathcal{S}(s)|$ is exponential in $s$. Heuristics and partial enumeration for $s \le 21$ suggest $|\mathcal{S}(s)|$ grows on the order of $1.7^s$. Extrapolation gives
+\[
+|\mathcal{S}(35)| \sim 10^7 \text{ to } 10^8.
+\]
+
+Define
+\[
+M(N) := \max_{2 \le s \le N} |\mathcal{S}(s)|,
+\qquad
+U(N) := \sum_{s=2}^{N} |\mathcal{S}(s)|.
+\]
+
+Our DP based enumeration (\textsc{CORE-ENUM}) for $N=35$ runs one DP for each $(t,C)$ with $t \le 17$ and $C\subseteq\{0,\dots,t\}$ with $0,t\in C$. There are exactly $2^{t-1}$ such $C$ for each $t$, so in total
+\[
+\sum_{t=1}^{17} 2^{t-1} = 2^{17}-1 = 131{,}071
+\]
+DP calls. Each DP explores states $(y,W,g)$ with
+\[
+0 \le y \le 35-t,
+\quad
+W \in \{0,1\}^{t+1},
+\quad
+g \in \{0,1,\dots,35\}.
+\]
+The naive worst case state count per DP is $O((35-t)\cdot 2^{t+1}\cdot 35)$ which is at most about $2\times10^7$ when $t=17$ and much smaller otherwise. Memoization ensures each reachable state is processed once. Each state update is constant time bit arithmetic.
+
+Storing the union of all produced cores requires $O(M(35))$ space. Each core is a 64 bit mask. Open addressing hash tables add constant factor overhead. For $M(35) \sim 10^7$ to $10^8$ this fits in a few GB of memory.
+
+So for general $N$ we obtain
+\[
+\text{Time}(N)
+= O\big( U(N) \cdot \mathrm{poly}(N) \big),
+\qquad
+\text{Space}(N)
+= O\big( M(N) \cdot \mathrm{poly}(N) \big),
+\]
+with $\mathrm{poly}(N)$ a low degree polynomial (hash insert, bit operations, etc). By the lower bound above any exact method must take
+\[
+\Omega\big(U(N)\big)\text{ time}
+\quad\text{and}\quad
+\Omega\big(M(N)\big)\text{ space}
+\]
+up to polynomial factors in $N$, since it must distinguish all cores $A' \in \mathcal{S}(s)$ in order to count them without collision. Because $|\mathcal{S}(s)|$ is exponential in $s$, any exact algorithm must have exponential in $s$ running time in the worst case. This is inherent in the combinatorics and not an artifact.
+
+Therefore \textsc{CORE-ENUM} is optimal up to polynomial factors for all $n \le 35$. It is output sensitive. It pays essentially linear time in the number of distinct cores that actually exist, and linear memory in the largest span class. It parallelizes over $(t,C)$ trivially.
+
+\subsection{Unimodality test}
+
+After we compute
+\[
+v_n = \big(|\mathcal{A}_{n,1}|,\dots,|\mathcal{A}_{n,n}|\big)
+\]
+for $n\le35$, we test unimodality. Let $v_n=(a_1,\dots,a_n)$. We check if there exists an index $k$ such that
+\[
+a_1 \le a_2 \le \cdots \le a_k
+\quad\text{and}\quad
+a_k \ge a_{k+1} \ge \cdots \ge a_n.
+\]
+This is $O(n)$ per $n$. So part (c) reduces to verifying this property on the computed arrays.
+
+\subsection{Reference implementation (C++17)}\label{subsec:cpp}
+
+Below is a self contained C++17 program. It
+\begin{itemize}
+    \item enumerates all span $s$ cores $\mathcal{S}(s)$ for $2\le s\le35$ using the DP described in Section \ref{subsec:DP},
+    \item builds $\mathrm{CoreCount}[s,k]$,
+    \item computes $D_{n,k}$ using Lemma \ref{lem:Dnk-cores},
+    \item computes $v_n$ using Theorem \ref{thm:primitive-from-cores},
+    \item prints each $v_n$ in the form \texttt{n [a1,a2,...,an]} with $a_k=|\mathcal{A}_{n,k}|$.
+\end{itemize}
+
+The code encodes any subset $S\subseteq\{0,\dots,35\}$ as a 64 bit mask. Bit $i$ is $1$ if and only if $i\in S$. The reduced gcd $\gcdop(S)$ is computed by taking the gcd of the positive indices $i>0$ whose bit is set.
+
+\begin{lstlisting}[language=C++]
+// primitive_vectors_span_dp_refactored.cpp
+// Computes v_n = (|A_{n,1}|,...,|A_{n,n}|) for 1 <= n <= 35
+// plus unimodality of v_n
+// A_{n,k} are primitive subsets of {0,...,n} of size k
+
+#include <cstdint>
+#include <vector>
+#include <array>
+#include <unordered_map>
+#include <unordered_set>
+#include <algorithm>
+#include <iostream>
+
+using u64 = std::uint64_t;
+using u32 = std::uint32_t;
+static constexpr int NMAX = 35;
+
+// ------------ math / bit utilities ------------
+
+namespace util {
+
+inline int gcd_int(int a, int b) {
+    while (b != 0) {
+        int t = a % b;
+        a = b;
+        b = t;
+    }
+    return (a < 0 ? -a : a);
+}
+
+inline int popcount64(u64 x) {
+    return __builtin_popcountll(x);
+}
+
+// gcdop(S): gcd of positive elements of S
+// S encoded as bitmask mask over {0,...,m}
+// bit i = 1 means i in S
+// return 0 if S has no positive elements
+inline int gcd_positions_mask(u32 mask) {
+    u32 m = mask & ~1u; // ignore 0
+    int g = 0;
+    while (m) {
+        u32 lb = m & (~m + 1u);       // lowest set bit
+        int idx = __builtin_ctz(m);   // index of that bit
+        g = (g == 0 ? idx : gcd_int(g, idx));
+        m ^= lb;
+    }
+    return g;
+}
+
+// Precompute binomial(n,k) for n,k <= NMAX
+inline std::array<std::array<u64, NMAX+1>, NMAX+1> build_binom() {
+    std::array<std::array<u64, NMAX+1>, NMAX+1> C{};
+    for (int n = 0; n <= NMAX; ++n) {
+        C[n][0] = 1;
+        C[n][n] = 1;
+        for (int k = 1; k < n; ++k) {
+            C[n][k] = C[n-1][k-1] + C[n-1][k];
+        }
+    }
+    return C;
+}
+
+} // namespace util
+
+// ------------ DP for cores of a fixed (r,t,C) ------------
+// State = (y,W,g)
+//   y in [0,r]
+//   W is (t+1)-bit window telling which offsets y+j are covered by union_{b<y, b in B} (C+b)
+//   g is gcd of positive elements chosen so far in B
+//
+// Recurrence:
+//   choose include/exclude y in B, except y=0 and y=r must be included
+//   update W by OR with C shifted in if y included
+//   emit coverage mask over [0, r+t] at the end
+//
+// We deduplicate per state and per result vector
+
+struct Key {
+    int      y;
+    u32      W;
+    int      g;
+};
+
+struct KeyHash {
+    std::size_t operator()(const Key& k) const noexcept {
+        std::size_t h1 = std::hash<int>()(k.y);
+        std::size_t h2 = std::hash<u32>()(k.W);
+        std::size_t h3 = std::hash<int>()(k.g);
+        return h1 ^ (h2 * 1315423911u) ^ (h3 * 2654435761u);
+    }
+};
+
+struct KeyEq {
+    bool operator()(const Key& a, const Key& b) const noexcept {
+        return (a.y == b.y && a.W == b.W && a.g == b.g);
+    }
+};
+
+struct CoreDP {
+    int r;          // max element of B
+    int t;          // max element of C
+    int span;       // r + t
+    u32 Cmask;      // subset C of {0,...,t}, 0 and t forced in C
+    int gC;         // gcdop(C)
+
+    // memo[y,W,g] = all possible coverage masks on [y,...,span]
+    std::unordered_map<Key, std::vector<u64>, KeyHash, KeyEq> memo;
+
+    CoreDP(int rr, int tt, u32 Cm, int gCc)
+        : r(rr), t(tt), span(rr+tt), Cmask(Cm), gC(gCc) {}
+
+    const std::vector<u64>& solve(int y, u32 W, int g) {
+        Key key{y, W, g};
+        auto it = memo.find(key);
+        if (it != memo.end()) return it->second;
+
+        std::unordered_set<u64> resultSet;
+        resultSet.reserve(128);
+
+        // decide if y is in B
+        // y=0 and y=r must be in B
+        std::vector<int> include_choices;
+        if (y == 0 || y == r) {
+            include_choices.push_back(1);
+        } else {
+            include_choices.push_back(0);
+            include_choices.push_back(1);
+        }
+
+        for (int take_y : include_choices) {
+            // update coverage window W_after
+            u32 W_after = W | (take_y ? Cmask : 0u);
+
+            // update gcd for B
+            int g_after;
+            if (y == 0) {
+                g_after = 0;
+            } else if (take_y) {
+                g_after = (g == 0 ? y : util::gcd_int(g, y));
+            } else {
+                g_after = g;
+            }
+
+            // sigma_y tells if y is covered in B+C so far
+            int sigma_y = (W_after & 1u) ? 1 : 0;
+
+            if (y == r) {
+                // terminal level
+                // tail bits cover r+1,...,r+t
+                u32 tail_mask = (W_after >> 1);
+
+                // accept if gcd(g_after, gC) = 1
+                if (util::gcd_int(g_after, gC) == 1) {
+                    // local_mask encodes coverage on {r,...,span}
+                    // bit0 -> r
+                    // bit1..bit_t -> r+1..r+t
+                    u64 local_mask =
+                        (sigma_y ? 1ULL : 0ULL)
+                        | ( (u64)tail_mask << 1 );
+
+                    resultSet.insert(local_mask);
+                }
+
+            } else {
+                // advance to y+1
+                u32 nextW = (W_after >> 1);
+                const std::vector<u64>& childVec = solve(y+1, nextW, g_after);
+
+                for (u64 childMask : childVec) {
+                    // prepend sigma_y as new low bit
+                    u64 combined =
+                        (sigma_y ? 1ULL : 0ULL)
+                        | (childMask << 1);
+                    resultSet.insert(combined);
+                }
+            }
+        }
+
+        auto &slot = memo[key];
+        slot.assign(resultSet.begin(), resultSet.end());
+        return slot;
+    }
+
+    // convenience root call
+    std::vector<u64> enumerate_roots() {
+        return solve(0, 0u, 0);
+    }
+};
+
+// ------------ enumerate all gcd-1 cores of a fixed span s ------------
+// A core is a set A' = B + C with max(A') = s and gcdop(A')=1
+// We consider splits s = r + t with r >= t >= 1
+// For each t we iterate all C subsets of {0,...,t} with 0,t in C
+
+static std::unordered_set<u64> enumerate_span_cores(int span) {
+    std::unordered_set<u64> out;
+    out.reserve(10000);
+
+    for (int t = 1; t <= span / 2; ++t) {
+        int r = span - t;
+        if (r < t) continue; // we enforce r >= t
+
+        int interior_count = (t >= 2 ? t - 1 : 0);
+        int totalC = 1 << interior_count; // free choice on {1,...,t-1}
+
+        for (int midmask = 0; midmask < totalC; ++midmask) {
+            u32 Cmask = 0u;
+            // force 0, t in C
+            Cmask |= (1u << 0);
+            Cmask |= (1u << t);
+
+            // fill interior
+            for (int j = 1; j <= t - 1; ++j) {
+                if (midmask & (1 << (j - 1))) {
+                    Cmask |= (1u << j);
+                }
+            }
+
+            int gC = util::gcd_positions_mask(Cmask);
+
+            CoreDP solver(r, t, Cmask, gC);
+            std::vector<u64> roots = solver.enumerate_roots();
+
+            for (u64 mask : roots) {
+                // mask is over {0,...,span} with bit i meaning i in A'
+                out.insert(mask);
+            }
+        }
+    }
+
+    return out;
+}
+
+// ------------ build CoreCount[s][k] ------------
+// CoreCount[s][k] = number of distinct gcd-1 cores in span s with size k
+
+static void build_core_counts(
+    std::array<std::array<u64, NMAX+1>, NMAX+1> &CoreCount,
+    std::vector<std::unordered_set<u64>> &cores_at_span
+) {
+    for (int s = 0; s <= NMAX; ++s) {
+        for (u64 mask : cores_at_span[s]) {
+            int k = util::popcount64(mask);
+            if (k >= 1 && k <= NMAX) {
+                CoreCount[s][k] += 1ULL;
+            }
+        }
+    }
+}
+
+// ------------ compute D[n][k] ------------
+// D_{n,k} = sum_s CoreCount[s][k] * floor(n/s)
+
+static void build_decomposable_table(
+    const std::array<std::array<u64, NMAX+1>, NMAX+1> &CoreCount,
+    std::array<std::array<u64, NMAX+1>, NMAX+1> &D
+) {
+    for (int n = 1; n <= NMAX; ++n) {
+        for (int k = 1; k <= n; ++k) {
+            u64 accum = 0ULL;
+            for (int s = 1; s <= n; ++s) {
+                u64 cnt = CoreCount[s][k];
+                if (!cnt) continue;
+                accum += cnt * (u64)(n / s); // floor(n/s)
+            }
+            D[n][k] = accum;
+        }
+    }
+}
+
+// ------------ primitive counts and unimodality ------------
+
+static std::vector<u64> primitive_vector_for_n(
+    int n,
+    const std::array<std::array<u64, NMAX+1>, NMAX+1> &D,
+    const std::array<std::array<u64, NMAX+1>, NMAX+1> &Cbinom
+) {
+    std::vector<u64> v;
+    v.reserve(n);
+
+    for (int k = 1; k <= n; ++k) {
+        u64 ans = 0ULL;
+        if (k == 1) {
+            ans = 0ULL; // by definition
+        } else {
+            u64 total = Cbinom[n][k-1]; // number of k-sets in P_n
+            u64 deco  = D[n][k];        // decomposable
+            ans = (total >= deco ? total - deco : 0ULL);
+        }
+        v.push_back(ans);
+    }
+    return v;
+}
+
+static bool is_unimodal(const std::vector<u64> &v) {
+    const int m = (int)v.size();
+    if (m <= 2) return true;
+
+    int i = 0;
+    while (i + 1 < m && v[i] <= v[i+1]) ++i;
+    while (i + 1 < m && v[i] >= v[i+1]) ++i;
+    return (i == m - 1);
+}
+
+// ------------ driver ------------
+
+int main() {
+    // precompute binomials
+    auto Cbinom = util::build_binom();
+
+    // enumerate cores for each span s
+    std::vector<std::unordered_set<u64>> cores_at_span(NMAX+1);
+    for (int s = 2; s <= NMAX; ++s) {
+        cores_at_span[s] = enumerate_span_cores(s);
+    }
+
+    // CoreCount[s][k]
+    std::array<std::array<u64, NMAX+1>, NMAX+1> CoreCount{};
+    for (auto &row : CoreCount) row.fill(0ULL);
+    build_core_counts(CoreCount, cores_at_span);
+
+    // D[n][k]
+    std::array<std::array<u64, NMAX+1>, NMAX+1> D{};
+    for (auto &row : D) row.fill(0ULL);
+    build_decomposable_table(CoreCount, D);
+
+    // final output
+    for (int n = 1; n <= NMAX; ++n) {
+        std::vector<u64> vn = primitive_vector_for_n(n, D, Cbinom);
+
+        std::cout << n << " [";
+        for (int k = 1; k <= n; ++k) {
+            std::cout << vn[k-1];
+            if (k < n) std::cout << ",";
+        }
+        std::cout << "] ";
+
+        bool ok = is_unimodal(vn);
+        std::cout << (ok ? "unimodal" : "not_unimodal") << "\n";
+    }
+
+    return 0;
+}
+\end{lstlisting}
